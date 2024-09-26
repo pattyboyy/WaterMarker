@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // Predefined font options
 const FONT_FAMILIES = [
@@ -61,8 +61,83 @@ function App() {
     }
   };
 
-  // Draw Canvas
-  const drawCanvas = () => {
+  // Convert Hex to RGB
+  const hexToRgb = (hex) => {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) {
+      hex = hex
+        .split('')
+        .map((char) => char + char)
+        .join('');
+    }
+    const bigint = parseInt(hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `${r}, ${g}, ${b}`;
+  };
+
+  // Handle Mouse Down
+  const handleMouseDown = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+
+    setIsDragging(true);
+    dragStartRef.current = { x: mouseX, y: mouseY };
+    positionStartRef.current = { ...position };
+  };
+
+  // Memoize handleMouseMove
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (!isDragging) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      const mouseX = (e.clientX - rect.left) * scaleX;
+      const mouseY = (e.clientY - rect.top) * scaleY;
+
+      const deltaX = mouseX - dragStartRef.current.x;
+      const deltaY = mouseY - dragStartRef.current.y;
+
+      const newX = Math.max(
+        0,
+        Math.min(
+          100,
+          positionStartRef.current.x + (deltaX / canvas.width) * 100
+        )
+      );
+      const newY = Math.max(
+        0,
+        Math.min(
+          100,
+          positionStartRef.current.y + (deltaY / canvas.height) * 100
+        )
+      );
+
+      setPosition({ x: newX, y: newY });
+    },
+    [isDragging]
+  );
+
+  // Memoize handleMouseUp
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Memoize drawCanvas
+  const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (canvas && image) {
       canvas.width = image.width;
@@ -108,13 +183,10 @@ function App() {
       }
 
       if (backgroundOpacity > 0) {
-        ctx.fillStyle = `rgba(${hexToRgb(backgroundColor)}, ${backgroundOpacity})`;
-        ctx.fillRect(
-          xOffset - 5,
-          -5,
-          maxTextWidth + 10,
-          textHeight + 10
-        );
+        ctx.fillStyle = `rgba(${hexToRgb(
+          backgroundColor
+        )}, ${backgroundOpacity})`;
+        ctx.fillRect(xOffset - 5, -5, maxTextWidth + 10, textHeight + 10);
       }
 
       ctx.fillStyle = fontColor;
@@ -125,65 +197,28 @@ function App() {
 
       ctx.restore();
     }
-  };
+  }, [
+    image,
+    watermarkText,
+    fontFamily,
+    fontSize,
+    fontWeight,
+    fontStyle,
+    fontColor,
+    opacity,
+    shadowColor,
+    shadowBlur,
+    shadowOffsetX,
+    shadowOffsetY,
+    backgroundColor,
+    backgroundOpacity,
+    textAlign,
+    rotation,
+    position,
+    lineHeight,
+  ]);
 
-  // Convert Hex to RGB
-  const hexToRgb = (hex) => {
-    hex = hex.replace('#', '');
-    if (hex.length === 3) {
-      hex = hex.split('').map((char) => char + char).join('');
-    }
-    const bigint = parseInt(hex, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `${r}, ${g}, ${b}`;
-  };
-
-  // Handle Mouse Down
-  const handleMouseDown = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    const mouseX = (e.clientX - rect.left) * scaleX;
-    const mouseY = (e.clientY - rect.top) * scaleY;
-
-    setIsDragging(true);
-    dragStartRef.current = { x: mouseX, y: mouseY };
-    positionStartRef.current = { ...position };
-  };
-
-  // Handle Mouse Move
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    const mouseX = (e.clientX - rect.left) * scaleX;
-    const mouseY = (e.clientY - rect.top) * scaleY;
-
-    const deltaX = mouseX - dragStartRef.current.x;
-    const deltaY = mouseY - dragStartRef.current.y;
-
-    const newX = Math.max(0, Math.min(100, positionStartRef.current.x + (deltaX / canvas.width) * 100));
-    const newY = Math.max(0, Math.min(100, positionStartRef.current.y + (deltaY / canvas.height) * 100));
-
-    setPosition({ x: newX, y: newY });
-  };
-
-  // Handle Mouse Up
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
+  // Event listeners for dragging
   useEffect(() => {
     const handleGlobalMouseMove = (e) => {
       if (isDragging) {
@@ -206,31 +241,12 @@ function App() {
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Update canvas whenever dependencies change
   useEffect(() => {
     drawCanvas();
-  }, [
-    image,
-    watermarkText,
-    fontFamily,
-    fontSize,
-    fontWeight,
-    fontStyle,
-    fontColor,
-    opacity,
-    shadowColor,
-    shadowBlur,
-    shadowOffsetX,
-    shadowOffsetY,
-    backgroundColor,
-    backgroundOpacity,
-    textAlign,
-    rotation,
-    position,
-    lineHeight,
-  ]);
+  }, [drawCanvas]);
 
   // Download the canvas as an image
   const handleDownload = () => {
@@ -421,7 +437,9 @@ function App() {
                   max="3"
                   step="0.1"
                   value={lineHeight}
-                  onChange={(e) => setLineHeight(parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    setLineHeight(parseFloat(e.target.value))
+                  }
                   className="w-full"
                 />
               </div>
@@ -480,7 +498,9 @@ function App() {
                   max="1"
                   step="0.01"
                   value={opacity}
-                  onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    setOpacity(parseFloat(e.target.value))
+                  }
                   className="w-full"
                 />
               </div>
@@ -516,7 +536,9 @@ function App() {
                   min="0"
                   max="20"
                   value={shadowBlur}
-                  onChange={(e) => setShadowBlur(parseInt(e.target.value))}
+                  onChange={(e) =>
+                    setShadowBlur(parseInt(e.target.value))
+                  }
                   className="w-full"
                 />
               </div>
@@ -535,7 +557,9 @@ function App() {
                   min="-20"
                   max="20"
                   value={shadowOffsetX}
-                  onChange={(e) => setShadowOffsetX(parseInt(e.target.value))}
+                  onChange={(e) =>
+                    setShadowOffsetX(parseInt(e.target.value))
+                  }
                   className="w-full"
                 />
               </div>
@@ -554,7 +578,9 @@ function App() {
                   min="-20"
                   max="20"
                   value={shadowOffsetY}
-                  onChange={(e) => setShadowOffsetY(parseInt(e.target.value))}
+                  onChange={(e) =>
+                    setShadowOffsetY(parseInt(e.target.value))
+                  }
                   className="w-full"
                 />
               </div>
@@ -591,7 +617,9 @@ function App() {
                   max="1"
                   step="0.01"
                   value={backgroundOpacity}
-                  onChange={(e) => setBackgroundOpacity(parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    setBackgroundOpacity(parseFloat(e.target.value))
+                  }
                   className="w-full"
                 />
               </div>
