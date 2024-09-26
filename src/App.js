@@ -36,6 +36,10 @@ function App() {
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isDragging, setIsDragging] = useState(false);
   const [lineHeight, setLineHeight] = useState(1.2);
+  const [isCropping, setIsCropping] = useState(false);
+  const [cropStart, setCropStart] = useState(null);
+  const [cropEnd, setCropEnd] = useState(null);
+  const [isCropMode, setIsCropMode] = useState(false);
 
   // Refs
   const canvasRef = useRef(null);
@@ -89,15 +93,20 @@ function App() {
     const mouseX = (e.clientX - rect.left) * scaleX;
     const mouseY = (e.clientY - rect.top) * scaleY;
 
-    setIsDragging(true);
-    dragStartRef.current = { x: mouseX, y: mouseY };
-    positionStartRef.current = { ...position };
+    if (isCropMode) {
+      setIsCropping(true);
+      setCropStart({ x: mouseX, y: mouseY });
+      setCropEnd({ x: mouseX, y: mouseY });
+    } else {
+      setIsDragging(true);
+      dragStartRef.current = { x: mouseX, y: mouseY };
+      positionStartRef.current = { ...position };
+    }
   };
 
   // Memoize handleMouseMove
   const handleMouseMove = useCallback(
     (e) => {
-      if (!isDragging) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -108,33 +117,42 @@ function App() {
       const mouseX = (e.clientX - rect.left) * scaleX;
       const mouseY = (e.clientY - rect.top) * scaleY;
 
-      const deltaX = mouseX - dragStartRef.current.x;
-      const deltaY = mouseY - dragStartRef.current.y;
+      if (isCropping && cropStart) {
+        setCropEnd({ x: mouseX, y: mouseY });
+      } else if (isDragging) {
+        const deltaX = mouseX - dragStartRef.current.x;
+        const deltaY = mouseY - dragStartRef.current.y;
 
-      const newX = Math.max(
-        0,
-        Math.min(
-          100,
-          positionStartRef.current.x + (deltaX / canvas.width) * 100
-        )
-      );
-      const newY = Math.max(
-        0,
-        Math.min(
-          100,
-          positionStartRef.current.y + (deltaY / canvas.height) * 100
-        )
-      );
+        const newX = Math.max(
+          0,
+          Math.min(
+            100,
+            positionStartRef.current.x + (deltaX / canvas.width) * 100
+          )
+        );
+        const newY = Math.max(
+          0,
+          Math.min(
+            100,
+            positionStartRef.current.y + (deltaY / canvas.height) * 100
+          )
+        );
 
-      setPosition({ x: newX, y: newY });
+        setPosition({ x: newX, y: newY });
+      }
     },
-    [isDragging]
+    [isDragging, isCropping, cropStart]
   );
 
   // Memoize handleMouseUp
   const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+    if (isCropping) {
+      setIsCropping(false);
+    }
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  }, [isCropping, isDragging]);
 
   // Memoize drawCanvas
   const drawCanvas = useCallback(() => {
@@ -146,56 +164,73 @@ function App() {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      ctx.globalAlpha = opacity;
-      ctx.font = `${fontWeight} ${fontStyle} ${fontSize}px ${fontFamily}`;
-      ctx.fillStyle = fontColor;
-      ctx.textAlign = textAlign;
-      ctx.textBaseline = 'top';
-      ctx.shadowColor = shadowColor;
-      ctx.shadowBlur = shadowBlur;
-      ctx.shadowOffsetX = shadowOffsetX;
-      ctx.shadowOffsetY = shadowOffsetY;
 
-      const lines = watermarkText.split('\n');
-      const lineHeightPx = fontSize * lineHeight;
-      let maxTextWidth = 0;
+      // Draw cropping rectangle
+      if (isCropping && cropStart && cropEnd) {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6]);
+        const x = cropStart.x;
+        const y = cropStart.y;
+        const width = cropEnd.x - cropStart.x;
+        const height = cropEnd.y - cropStart.y;
+        ctx.strokeRect(x, y, width, height);
+        ctx.setLineDash([]);
+      }
 
-      lines.forEach((line) => {
-        const metrics = ctx.measureText(line);
-        if (metrics.width > maxTextWidth) {
-          maxTextWidth = metrics.width;
+      // Draw watermark if not in cropping mode
+      if (!isCropMode) {
+        ctx.globalAlpha = opacity;
+        ctx.font = `${fontWeight} ${fontStyle} ${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = fontColor;
+        ctx.textAlign = textAlign;
+        ctx.textBaseline = 'top';
+        ctx.shadowColor = shadowColor;
+        ctx.shadowBlur = shadowBlur;
+        ctx.shadowOffsetX = shadowOffsetX;
+        ctx.shadowOffsetY = shadowOffsetY;
+
+        const lines = watermarkText.split('\n');
+        const lineHeightPx = fontSize * lineHeight;
+        let maxTextWidth = 0;
+
+        lines.forEach((line) => {
+          const metrics = ctx.measureText(line);
+          if (metrics.width > maxTextWidth) {
+            maxTextWidth = metrics.width;
+          }
+        });
+
+        const textHeight = lineHeightPx * lines.length;
+        const xPos = (position.x / 100) * canvas.width;
+        const yPos = (position.y / 100) * canvas.height;
+
+        ctx.save();
+        ctx.translate(xPos, yPos);
+        ctx.rotate((rotation * Math.PI) / 180);
+
+        let xOffset = 0;
+        if (textAlign === 'center') {
+          xOffset = -maxTextWidth / 2;
+        } else if (textAlign === 'right') {
+          xOffset = -maxTextWidth;
         }
-      });
 
-      const textHeight = lineHeightPx * lines.length;
-      const xPos = (position.x / 100) * canvas.width;
-      const yPos = (position.y / 100) * canvas.height;
+        if (backgroundOpacity > 0) {
+          ctx.fillStyle = `rgba(${hexToRgb(
+            backgroundColor
+          )}, ${backgroundOpacity})`;
+          ctx.fillRect(xOffset - 5, -5, maxTextWidth + 10, textHeight + 10);
+        }
 
-      ctx.save();
-      ctx.translate(xPos, yPos);
-      ctx.rotate((rotation * Math.PI) / 180);
+        ctx.fillStyle = fontColor;
 
-      let xOffset = 0;
-      if (textAlign === 'center') {
-        xOffset = -maxTextWidth / 2;
-      } else if (textAlign === 'right') {
-        xOffset = -maxTextWidth;
+        lines.forEach((line, index) => {
+          ctx.fillText(line, xOffset, index * lineHeightPx);
+        });
+
+        ctx.restore();
       }
-
-      if (backgroundOpacity > 0) {
-        ctx.fillStyle = `rgba(${hexToRgb(
-          backgroundColor
-        )}, ${backgroundOpacity})`;
-        ctx.fillRect(xOffset - 5, -5, maxTextWidth + 10, textHeight + 10);
-      }
-
-      ctx.fillStyle = fontColor;
-
-      lines.forEach((line, index) => {
-        ctx.fillText(line, xOffset, index * lineHeightPx);
-      });
-
-      ctx.restore();
     }
   }, [
     image,
@@ -216,23 +251,27 @@ function App() {
     rotation,
     position,
     lineHeight,
+    isCropping,
+    cropStart,
+    cropEnd,
+    isCropMode,
   ]);
 
-  // Event listeners for dragging
+  // Event listeners for dragging and cropping
   useEffect(() => {
     const handleGlobalMouseMove = (e) => {
-      if (isDragging) {
+      if (isDragging || isCropping) {
         handleMouseMove(e);
       }
     };
 
     const handleGlobalMouseUp = () => {
-      if (isDragging) {
+      if (isDragging || isCropping) {
         handleMouseUp();
       }
     };
 
-    if (isDragging) {
+    if (isDragging || isCropping) {
       window.addEventListener('mousemove', handleGlobalMouseMove);
       window.addEventListener('mouseup', handleGlobalMouseUp);
     }
@@ -241,12 +280,51 @@ function App() {
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, isCropping, handleMouseMove, handleMouseUp]);
 
   // Update canvas whenever dependencies change
   useEffect(() => {
     drawCanvas();
   }, [drawCanvas]);
+
+  // Perform the crop operation
+  const handleCrop = () => {
+    if (cropStart && cropEnd) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const x = Math.min(cropStart.x, cropEnd.x);
+      const y = Math.min(cropStart.y, cropEnd.y);
+      const width = Math.abs(cropEnd.x - cropStart.x);
+      const height = Math.abs(cropEnd.y - cropStart.y);
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      tempCtx.drawImage(
+        image,
+        x,
+        y,
+        width,
+        height,
+        0,
+        0,
+        width,
+        height
+      );
+
+      const croppedImage = new Image();
+      croppedImage.onload = () => {
+        setImage(croppedImage);
+        setCropStart(null);
+        setCropEnd(null);
+        setIsCropMode(false);
+      };
+      croppedImage.src = tempCanvas.toDataURL();
+    }
+  };
 
   // Download the canvas as an image
   const handleDownload = () => {
@@ -299,340 +377,394 @@ function App() {
                   width: '100%',
                   height: 'auto',
                   display: 'block',
-                  cursor: isDragging ? 'grabbing' : 'grab',
+                  cursor: isDragging || isCropping ? 'grabbing' : 'crosshair',
                 }}
               />
             </div>
 
             {/* Controls */}
             <div className="space-y-6 overflow-auto max-h-screen">
-              {/* Watermark Text */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="watermarkText"
-                >
-                  Watermark Text
-                </label>
-                <textarea
-                  id="watermarkText"
-                  value={watermarkText}
-                  onChange={(e) => setWatermarkText(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                  rows="3"
-                />
-              </div>
-
-              {/* Font Family */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="fontFamily"
-                >
-                  Font Family
-                </label>
-                <select
-                  id="fontFamily"
-                  value={fontFamily}
-                  onChange={(e) => setFontFamily(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                >
-                  {FONT_FAMILIES.map((font) => (
-                    <option key={font} value={font}>
-                      {font}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Font Size */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="fontSize"
-                >
-                  Font Size: {fontSize}px
-                </label>
-                <input
-                  type="range"
-                  id="fontSize"
-                  min="10"
-                  max="500"
-                  value={fontSize}
-                  onChange={(e) => setFontSize(parseInt(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Font Color */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="fontColor"
-                >
-                  Font Color
-                </label>
-                <input
-                  type="color"
-                  id="fontColor"
-                  value={fontColor}
-                  onChange={(e) => setFontColor(e.target.value)}
-                  className="w-full h-10 p-0 border-0"
-                />
-              </div>
-
-              {/* Font Weight */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="fontWeight"
-                >
-                  Font Weight
-                </label>
-                <select
-                  id="fontWeight"
-                  value={fontWeight}
-                  onChange={(e) => setFontWeight(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="bold">Bold</option>
-                  <option value="bolder">Bolder</option>
-                  <option value="lighter">Lighter</option>
-                </select>
-              </div>
-
-              {/* Font Style */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="fontStyle"
-                >
-                  Font Style
-                </label>
-                <select
-                  id="fontStyle"
-                  value={fontStyle}
-                  onChange={(e) => setFontStyle(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="italic">Italic</option>
-                  <option value="oblique">Oblique</option>
-                </select>
-              </div>
-
-              {/* Line Height */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="lineHeight"
-                >
-                  Line Height: {lineHeight}
-                </label>
-                <input
-                  type="range"
-                  id="lineHeight"
-                  min="1"
-                  max="3"
-                  step="0.1"
-                  value={lineHeight}
-                  onChange={(e) =>
-                    setLineHeight(parseFloat(e.target.value))
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              {/* Text Alignment */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="textAlign"
-                >
-                  Text Alignment
-                </label>
-                <select
-                  id="textAlign"
-                  value={textAlign}
-                  onChange={(e) => setTextAlign(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                >
-                  <option value="left">Left</option>
-                  <option value="center">Center</option>
-                  <option value="right">Right</option>
-                </select>
-              </div>
-
-              {/* Rotation */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="rotation"
-                >
-                  Rotation: {rotation}°
-                </label>
-                <input
-                  type="range"
-                  id="rotation"
-                  min="0"
-                  max="360"
-                  value={rotation}
-                  onChange={(e) => setRotation(parseInt(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Opacity */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="opacity"
-                >
-                  Opacity: {opacity}
-                </label>
-                <input
-                  type="range"
-                  id="opacity"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={opacity}
-                  onChange={(e) =>
-                    setOpacity(parseFloat(e.target.value))
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              {/* Shadow Color */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="shadowColor"
-                >
-                  Shadow Color
-                </label>
-                <input
-                  type="color"
-                  id="shadowColor"
-                  value={shadowColor}
-                  onChange={(e) => setShadowColor(e.target.value)}
-                  className="w-full h-10 p-0 border-0"
-                />
-              </div>
-
-              {/* Shadow Blur */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="shadowBlur"
-                >
-                  Shadow Blur: {shadowBlur}px
-                </label>
-                <input
-                  type="range"
-                  id="shadowBlur"
-                  min="0"
-                  max="20"
-                  value={shadowBlur}
-                  onChange={(e) =>
-                    setShadowBlur(parseInt(e.target.value))
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              {/* Shadow Offset X */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="shadowOffsetX"
-                >
-                  Shadow Offset X: {shadowOffsetX}px
-                </label>
-                <input
-                  type="range"
-                  id="shadowOffsetX"
-                  min="-20"
-                  max="20"
-                  value={shadowOffsetX}
-                  onChange={(e) =>
-                    setShadowOffsetX(parseInt(e.target.value))
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              {/* Shadow Offset Y */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="shadowOffsetY"
-                >
-                  Shadow Offset Y: {shadowOffsetY}px
-                </label>
-                <input
-                  type="range"
-                  id="shadowOffsetY"
-                  min="-20"
-                  max="20"
-                  value={shadowOffsetY}
-                  onChange={(e) =>
-                    setShadowOffsetY(parseInt(e.target.value))
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              {/* Background Color */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="backgroundColor"
-                >
-                  Background Color
-                </label>
-                <input
-                  type="color"
-                  id="backgroundColor"
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="w-full h-10 p-0 border-0"
-                />
-              </div>
-
-              {/* Background Opacity */}
-              <div>
-                <label
-                  className="block text-gray-700 text-sm font-bold mb-2"
-                  htmlFor="backgroundOpacity"
-                >
-                  Background Opacity: {backgroundOpacity}
-                </label>
-                <input
-                  type="range"
-                  id="backgroundOpacity"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={backgroundOpacity}
-                  onChange={(e) =>
-                    setBackgroundOpacity(parseFloat(e.target.value))
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              {/* Download Button */}
-              <div>
+              {/* Mode Toggle */}
+              <div className="flex space-x-4">
                 <button
-                  onClick={handleDownload}
-                  className="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600"
+                  onClick={() => setIsCropMode(false)}
+                  className={`w-full py-2 px-4 rounded ${
+                    !isCropMode
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
                 >
-                  Download Watermarked Image
+                  Watermark Mode
+                </button>
+                <button
+                  onClick={() => setIsCropMode(true)}
+                  className={`w-full py-2 px-4 rounded ${
+                    isCropMode
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Crop Mode
                 </button>
               </div>
+
+              {!isCropMode && (
+                <>
+                  {/* Watermark Text */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="watermarkText"
+                    >
+                      Watermark Text
+                    </label>
+                    <textarea
+                      id="watermarkText"
+                      value={watermarkText}
+                      onChange={(e) => setWatermarkText(e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                      rows="3"
+                    />
+                  </div>
+
+                  {/* Font Family */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="fontFamily"
+                    >
+                      Font Family
+                    </label>
+                    <select
+                      id="fontFamily"
+                      value={fontFamily}
+                      onChange={(e) => setFontFamily(e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                    >
+                      {FONT_FAMILIES.map((font) => (
+                        <option key={font} value={font}>
+                          {font}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Font Size */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="fontSize"
+                    >
+                      Font Size: {fontSize}px
+                    </label>
+                    <input
+                      type="range"
+                      id="fontSize"
+                      min="10"
+                      max="500"
+                      value={fontSize}
+                      onChange={(e) =>
+                        setFontSize(parseInt(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Font Color */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="fontColor"
+                    >
+                      Font Color
+                    </label>
+                    <input
+                      type="color"
+                      id="fontColor"
+                      value={fontColor}
+                      onChange={(e) => setFontColor(e.target.value)}
+                      className="w-full h-10 p-0 border-0"
+                    />
+                  </div>
+
+                  {/* Font Weight */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="fontWeight"
+                    >
+                      Font Weight
+                    </label>
+                    <select
+                      id="fontWeight"
+                      value={fontWeight}
+                      onChange={(e) => setFontWeight(e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="bold">Bold</option>
+                      <option value="bolder">Bolder</option>
+                      <option value="lighter">Lighter</option>
+                    </select>
+                  </div>
+
+                  {/* Font Style */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="fontStyle"
+                    >
+                      Font Style
+                    </label>
+                    <select
+                      id="fontStyle"
+                      value={fontStyle}
+                      onChange={(e) => setFontStyle(e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="italic">Italic</option>
+                      <option value="oblique">Oblique</option>
+                    </select>
+                  </div>
+
+                  {/* Line Height */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="lineHeight"
+                    >
+                      Line Height: {lineHeight}
+                    </label>
+                    <input
+                      type="range"
+                      id="lineHeight"
+                      min="1"
+                      max="3"
+                      step="0.1"
+                      value={lineHeight}
+                      onChange={(e) =>
+                        setLineHeight(parseFloat(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Text Alignment */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="textAlign"
+                    >
+                      Text Alignment
+                    </label>
+                    <select
+                      id="textAlign"
+                      value={textAlign}
+                      onChange={(e) => setTextAlign(e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+
+                  {/* Rotation */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="rotation"
+                    >
+                      Rotation: {rotation}°
+                    </label>
+                    <input
+                      type="range"
+                      id="rotation"
+                      min="0"
+                      max="360"
+                      value={rotation}
+                      onChange={(e) =>
+                        setRotation(parseInt(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Opacity */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="opacity"
+                    >
+                      Opacity: {opacity}
+                    </label>
+                    <input
+                      type="range"
+                      id="opacity"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={opacity}
+                      onChange={(e) =>
+                        setOpacity(parseFloat(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Shadow Color */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="shadowColor"
+                    >
+                      Shadow Color
+                    </label>
+                    <input
+                      type="color"
+                      id="shadowColor"
+                      value={shadowColor}
+                      onChange={(e) => setShadowColor(e.target.value)}
+                      className="w-full h-10 p-0 border-0"
+                    />
+                  </div>
+
+                  {/* Shadow Blur */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="shadowBlur"
+                    >
+                      Shadow Blur: {shadowBlur}px
+                    </label>
+                    <input
+                      type="range"
+                      id="shadowBlur"
+                      min="0"
+                      max="20"
+                      value={shadowBlur}
+                      onChange={(e) =>
+                        setShadowBlur(parseInt(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Shadow Offset X */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="shadowOffsetX"
+                    >
+                      Shadow Offset X: {shadowOffsetX}px
+                    </label>
+                    <input
+                      type="range"
+                      id="shadowOffsetX"
+                      min="-20"
+                      max="20"
+                      value={shadowOffsetX}
+                      onChange={(e) =>
+                        setShadowOffsetX(parseInt(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Shadow Offset Y */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="shadowOffsetY"
+                    >
+                      Shadow Offset Y: {shadowOffsetY}px
+                    </label>
+                    <input
+                      type="range"
+                      id="shadowOffsetY"
+                      min="-20"
+                      max="20"
+                      value={shadowOffsetY}
+                      onChange={(e) =>
+                        setShadowOffsetY(parseInt(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Background Color */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="backgroundColor"
+                    >
+                      Background Color
+                    </label>
+                    <input
+                      type="color"
+                      id="backgroundColor"
+                      value={backgroundColor}
+                      onChange={(e) => setBackgroundColor(e.target.value)}
+                      className="w-full h-10 p-0 border-0"
+                    />
+                  </div>
+
+                  {/* Background Opacity */}
+                  <div>
+                    <label
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                      htmlFor="backgroundOpacity"
+                    >
+                      Background Opacity: {backgroundOpacity}
+                    </label>
+                    <input
+                      type="range"
+                      id="backgroundOpacity"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={backgroundOpacity}
+                      onChange={(e) =>
+                        setBackgroundOpacity(parseFloat(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Download Button */}
+                  <div>
+                    <button
+                      onClick={handleDownload}
+                      className="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600"
+                    >
+                      Download Watermarked Image
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {isCropMode && (
+                <>
+                  {/* Crop Instructions */}
+                  <div className="text-gray-700">
+                    <p className="mb-2">
+                      Click and drag on the image to select the crop area.
+                    </p>
+                    <button
+                      onClick={handleCrop}
+                      disabled={!cropStart || !cropEnd}
+                      className={`w-full py-2 px-4 rounded ${
+                        cropStart && cropEnd
+                          ? 'bg-green-500 text-white hover:bg-green-600'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Crop Image
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
