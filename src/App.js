@@ -339,7 +339,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4">
-      <h1 className="text-3xl font-bold mb-6">Image Watermark Tool</h1>
+      <h1 className="text-3xl font-bold mb-6">Kathy's Watermark Tool</h1>
 
       <div className="w-full max-w-5xl bg-white p-6 rounded shadow">
         {/* Image Upload Section */}
