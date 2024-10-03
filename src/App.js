@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import * as LucideIcons from 'lucide-react';
 
 // Predefined font options
 const FONT_FAMILIES = [
@@ -104,7 +105,7 @@ function App() {
     }
   };
 
-  // Memoize handleMouseMove
+  // Handle Mouse Move
   const handleMouseMove = useCallback(
     (e) => {
       const canvas = canvasRef.current;
@@ -144,7 +145,7 @@ function App() {
     [isDragging, isCropping, cropStart]
   );
 
-  // Memoize handleMouseUp
+  // Handle Mouse Up
   const handleMouseUp = useCallback(() => {
     if (isCropping) {
       setIsCropping(false);
@@ -154,7 +155,7 @@ function App() {
     }
   }, [isCropping, isDragging]);
 
-  // Memoize drawCanvas
+  // Draw Canvas
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (canvas && image) {
@@ -338,42 +339,50 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4">
-      <h1 className="text-3xl font-bold mb-6">Kathy's Watermark Tool</h1>
+    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-indigo-200 flex flex-col items-center p-8">
+      <h1 className="text-4xl font-bold mb-8 text-indigo-800">Kathy's Watermark Tool</h1>
 
-      <div className="w-full max-w-5xl bg-white p-6 rounded shadow">
+      <div className="w-full max-w-6xl bg-white p-8 rounded-lg shadow-lg">
         {/* Image Upload Section */}
-        <div className="mb-6">
+        <div className="mb-8">
           <label
-            className="block text-gray-700 text-sm font-bold mb-2"
+            className="block text-indigo-700 text-lg font-semibold mb-3"
             htmlFor="imageUpload"
           >
             Upload Image
           </label>
-          <input
-            type="file"
-            id="imageUpload"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-blue-50 file:text-blue-700
-                  hover:file:bg-blue-100"
-          />
+          <div className="flex items-center justify-center w-full">
+            <label
+              htmlFor="imageUpload"
+              className="flex flex-col items-center justify-center w-full h-64 border-2 border-indigo-300 border-dashed rounded-lg cursor-pointer bg-indigo-50 hover:bg-indigo-100 transition duration-300"
+            >
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <LucideIcons.Image className="w-12 h-12 mb-4 text-indigo-500" />
+                <p className="mb-2 text-sm text-indigo-600">
+                  <span className="font-semibold">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-xs text-indigo-500">PNG, JPG or GIF (MAX. 800x400px)</p>
+              </div>
+              <input
+                type="file"
+                id="imageUpload"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Customization Options */}
         {imageSrc && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Canvas Preview */}
-            <div className="relative bg-gray-200">
+            <div className="relative bg-gray-100 rounded-lg overflow-hidden shadow-md">
               <canvas
                 ref={canvasRef}
                 onMouseDown={handleMouseDown}
                 style={{
-                  border: '1px solid #ccc',
                   width: '100%',
                   height: 'auto',
                   display: 'block',
@@ -383,25 +392,25 @@ function App() {
             </div>
 
             {/* Controls */}
-            <div className="space-y-6 overflow-auto max-h-screen">
+            <div className="space-y-8 overflow-auto max-h-[calc(100vh-16rem)]">
               {/* Mode Toggle */}
               <div className="flex space-x-4">
                 <button
                   onClick={() => setIsCropMode(false)}
-                  className={`w-full py-2 px-4 rounded ${
+                  className={`flex-1 py-3 px-4 rounded-full transition duration-300 ${
                     !isCropMode
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 >
                   Watermark Mode
                 </button>
                 <button
                   onClick={() => setIsCropMode(true)}
-                  className={`w-full py-2 px-4 rounded ${
+                  className={`flex-1 py-3 px-4 rounded-full transition duration-300 ${
                     isCropMode
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 >
                   Crop Mode
@@ -413,7 +422,7 @@ function App() {
                   {/* Watermark Text */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="watermarkText"
                     >
                       Watermark Text
@@ -422,7 +431,7 @@ function App() {
                       id="watermarkText"
                       value={watermarkText}
                       onChange={(e) => setWatermarkText(e.target.value)}
-                      className="w-full px-3 py-2 border rounded"
+                      className="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       rows="3"
                     />
                   </div>
@@ -430,7 +439,7 @@ function App() {
                   {/* Font Family */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="fontFamily"
                     >
                       Font Family
@@ -439,7 +448,7 @@ function App() {
                       id="fontFamily"
                       value={fontFamily}
                       onChange={(e) => setFontFamily(e.target.value)}
-                      className="w-full px-3 py-2 border rounded"
+                      className="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
                       {FONT_FAMILIES.map((font) => (
                         <option key={font} value={font}>
@@ -452,7 +461,7 @@ function App() {
                   {/* Font Size */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="fontSize"
                     >
                       Font Size: {fontSize}px
@@ -463,9 +472,7 @@ function App() {
                       min="10"
                       max="500"
                       value={fontSize}
-                      onChange={(e) =>
-                        setFontSize(parseInt(e.target.value))
-                      }
+                      onChange={(e) => setFontSize(parseInt(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -473,7 +480,7 @@ function App() {
                   {/* Font Color */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="fontColor"
                     >
                       Font Color
@@ -483,14 +490,14 @@ function App() {
                       id="fontColor"
                       value={fontColor}
                       onChange={(e) => setFontColor(e.target.value)}
-                      className="w-full h-10 p-0 border-0"
+                      className="w-full h-10 p-0 border-0 rounded-lg"
                     />
                   </div>
 
                   {/* Font Weight */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="fontWeight"
                     >
                       Font Weight
@@ -499,7 +506,7 @@ function App() {
                       id="fontWeight"
                       value={fontWeight}
                       onChange={(e) => setFontWeight(e.target.value)}
-                      className="w-full px-3 py-2 border rounded"
+                      className="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
                       <option value="normal">Normal</option>
                       <option value="bold">Bold</option>
@@ -511,7 +518,7 @@ function App() {
                   {/* Font Style */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="fontStyle"
                     >
                       Font Style
@@ -520,7 +527,7 @@ function App() {
                       id="fontStyle"
                       value={fontStyle}
                       onChange={(e) => setFontStyle(e.target.value)}
-                      className="w-full px-3 py-2 border rounded"
+                      className="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
                       <option value="normal">Normal</option>
                       <option value="italic">Italic</option>
@@ -531,7 +538,7 @@ function App() {
                   {/* Line Height */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="lineHeight"
                     >
                       Line Height: {lineHeight}
@@ -543,9 +550,7 @@ function App() {
                       max="3"
                       step="0.1"
                       value={lineHeight}
-                      onChange={(e) =>
-                        setLineHeight(parseFloat(e.target.value))
-                      }
+                      onChange={(e) => setLineHeight(parseFloat(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -553,7 +558,7 @@ function App() {
                   {/* Text Alignment */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="textAlign"
                     >
                       Text Alignment
@@ -562,7 +567,7 @@ function App() {
                       id="textAlign"
                       value={textAlign}
                       onChange={(e) => setTextAlign(e.target.value)}
-                      className="w-full px-3 py-2 border rounded"
+                      className="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
                       <option value="left">Left</option>
                       <option value="center">Center</option>
@@ -573,7 +578,7 @@ function App() {
                   {/* Rotation */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="rotation"
                     >
                       Rotation: {rotation}°
@@ -584,9 +589,7 @@ function App() {
                       min="0"
                       max="360"
                       value={rotation}
-                      onChange={(e) =>
-                        setRotation(parseInt(e.target.value))
-                      }
+                      onChange={(e) => setRotation(parseInt(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -594,7 +597,7 @@ function App() {
                   {/* Opacity */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="opacity"
                     >
                       Opacity: {opacity}
@@ -606,9 +609,7 @@ function App() {
                       max="1"
                       step="0.01"
                       value={opacity}
-                      onChange={(e) =>
-                        setOpacity(parseFloat(e.target.value))
-                      }
+                      onChange={(e) => setOpacity(parseFloat(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -616,7 +617,7 @@ function App() {
                   {/* Shadow Color */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="shadowColor"
                     >
                       Shadow Color
@@ -626,14 +627,14 @@ function App() {
                       id="shadowColor"
                       value={shadowColor}
                       onChange={(e) => setShadowColor(e.target.value)}
-                      className="w-full h-10 p-0 border-0"
+                      className="w-full h-10 p-0 border-0 rounded-lg"
                     />
                   </div>
 
                   {/* Shadow Blur */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="shadowBlur"
                     >
                       Shadow Blur: {shadowBlur}px
@@ -644,9 +645,7 @@ function App() {
                       min="0"
                       max="20"
                       value={shadowBlur}
-                      onChange={(e) =>
-                        setShadowBlur(parseInt(e.target.value))
-                      }
+                      onChange={(e) => setShadowBlur(parseInt(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -654,7 +653,7 @@ function App() {
                   {/* Shadow Offset X */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="shadowOffsetX"
                     >
                       Shadow Offset X: {shadowOffsetX}px
@@ -665,9 +664,7 @@ function App() {
                       min="-20"
                       max="20"
                       value={shadowOffsetX}
-                      onChange={(e) =>
-                        setShadowOffsetX(parseInt(e.target.value))
-                      }
+                      onChange={(e) => setShadowOffsetX(parseInt(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -675,7 +672,7 @@ function App() {
                   {/* Shadow Offset Y */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="shadowOffsetY"
                     >
                       Shadow Offset Y: {shadowOffsetY}px
@@ -686,9 +683,7 @@ function App() {
                       min="-20"
                       max="20"
                       value={shadowOffsetY}
-                      onChange={(e) =>
-                        setShadowOffsetY(parseInt(e.target.value))
-                      }
+                      onChange={(e) => setShadowOffsetY(parseInt(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -696,7 +691,7 @@ function App() {
                   {/* Background Color */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="backgroundColor"
                     >
                       Background Color
@@ -706,14 +701,14 @@ function App() {
                       id="backgroundColor"
                       value={backgroundColor}
                       onChange={(e) => setBackgroundColor(e.target.value)}
-                      className="w-full h-10 p-0 border-0"
+                      className="w-full h-10 p-0 border-0 rounded-lg"
                     />
                   </div>
 
                   {/* Background Opacity */}
                   <div>
                     <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
+                      className="block text-indigo-700 text-sm font-semibold mb-2"
                       htmlFor="backgroundOpacity"
                     >
                       Background Opacity: {backgroundOpacity}
@@ -725,9 +720,7 @@ function App() {
                       max="1"
                       step="0.01"
                       value={backgroundOpacity}
-                      onChange={(e) =>
-                        setBackgroundOpacity(parseFloat(e.target.value))
-                      }
+                      onChange={(e) => setBackgroundOpacity(parseFloat(e.target.value))}
                       className="w-full"
                     />
                   </div>
@@ -736,9 +729,10 @@ function App() {
                   <div>
                     <button
                       onClick={handleDownload}
-                      className="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600"
+                      className="w-full bg-green-500 text-white py-3 px-4 rounded-full hover:bg-green-600 transition duration-300 flex items-center justify-center space-x-2"
                     >
-                      Download Watermarked Image
+                      <LucideIcons.ArrowDownCircle className="w-5 h-5" />
+                      <span>Download Watermarked Image</span>
                     </button>
                   </div>
                 </>
@@ -747,20 +741,21 @@ function App() {
               {isCropMode && (
                 <>
                   {/* Crop Instructions */}
-                  <div className="text-gray-700">
-                    <p className="mb-2">
+                  <div className="text-indigo-700">
+                    <p className="mb-4">
                       Click and drag on the image to select the crop area.
                     </p>
                     <button
                       onClick={handleCrop}
                       disabled={!cropStart || !cropEnd}
-                      className={`w-full py-2 px-4 rounded ${
+                      className={`w-full py-3 px-4 rounded-full transition duration-300 flex items-center justify-center space-x-2 ${
                         cropStart && cropEnd
                           ? 'bg-green-500 text-white hover:bg-green-600'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                     >
-                      Crop Image
+                      <LucideIcons.Crop className="w-5 h-5" />
+                      <span>Crop Image</span>
                     </button>
                   </div>
                 </>
